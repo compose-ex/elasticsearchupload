@@ -5,18 +5,14 @@ import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
 import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
-import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
 import org.elasticsearch.action.admin.indices.create.CreateIndexResponse;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
-import org.elasticsearch.action.main.MainResponse;
 import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
-import org.elasticsearch.client.RestClientBuilder;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.common.xcontent.XContentType;
 
@@ -25,14 +21,12 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 public class BulkUpload {
 
     public static void main(String[] args) {
+        long t = System.currentTimeMillis();
+
         URL url = null;
 
         try {
@@ -69,12 +63,10 @@ public class BulkUpload {
                 System.out.println("Index exists");
             }
 
-            Stream<String> stream= Files.lines(Paths.get("enron.json"));
-
             BulkRequest request=new BulkRequest();
 
             int count=0;
-            int batch=15000;
+            int batch = 1000;
 
             BufferedReader br=new BufferedReader(new FileReader("enron.json"));
 
@@ -84,33 +76,39 @@ public class BulkUpload {
                 request.add(new IndexRequest(indexName,"mail").source(line, XContentType.JSON));
                 count++;
                 if(count%batch==0) {
-                    BulkResponse bulkresp=client.bulk(request);
-                    if(bulkresp.hasFailures()) {
+                    BulkResponse bulkresp = client.bulk(request);
+                    if (bulkresp.hasFailures()) {
                         for (BulkItemResponse bulkItemResponse : bulkresp) {
                             if (bulkItemResponse.isFailed()) {
                                 BulkItemResponse.Failure failure = bulkItemResponse.getFailure();
-                                System.out.println("Error"+failure.toString());
-                            }                        }
-                        } else {
-                        System.out.println(batch+" items onward! " + count);
+                                System.out.println("Error " + failure.toString());
+                            }
+                        }
                     }
-
+                    System.out.println("Uploaded " + count + " so far");
                     request=new BulkRequest();
                 }
             }
-            BulkResponse bulkresp=client.bulk(request);
-            if(bulkresp.hasFailures()) {
-                for (BulkItemResponse bulkItemResponse : bulkresp) {
-                    if (bulkItemResponse.isFailed()) {
-                        BulkItemResponse.Failure failure = bulkItemResponse.getFailure();
-                        System.out.println("Error"+failure.toString());
-                    }                        }
-            } else {
-                System.out.println("And done with "+count);
+
+            if (request.numberOfActions() > 0) {
+                BulkResponse bulkresp = client.bulk(request);
+                if (bulkresp.hasFailures()) {
+                    for (BulkItemResponse bulkItemResponse : bulkresp) {
+                        if (bulkItemResponse.isFailed()) {
+                            BulkItemResponse.Failure failure = bulkItemResponse.getFailure();
+                            System.out.println("Error " + failure.toString());
+                        }
+                    }
+                }
             }
+
+            System.out.println("Total uploaded: " + count);
             client.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        long tn = System.currentTimeMillis();
+        System.out.println("Took " + (tn - t) / 1000 + " seconds");
     }
 }

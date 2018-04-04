@@ -26,12 +26,9 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 
 public class BulkProcessorUpload {
 
@@ -74,12 +71,14 @@ public class BulkProcessorUpload {
                 System.out.println("Index exists");
             }
 
-            Stream<String> stream = Files.lines(Paths.get("enron.json"));
 
             BulkProcessor.Listener listener = new BulkProcessor.Listener() {
+                int count = 0;
+
                 @Override
                 public void beforeBulk(long l, BulkRequest bulkRequest) {
-                    System.out.println("Doing " + bulkRequest.numberOfActions());
+                    count = count + bulkRequest.numberOfActions();
+                    System.out.println("Uploaded " + count + " so far");
                 }
 
                 @Override
@@ -88,7 +87,7 @@ public class BulkProcessorUpload {
                         for (BulkItemResponse bulkItemResponse : bulkResponse) {
                             if (bulkItemResponse.isFailed()) {
                                 BulkItemResponse.Failure failure = bulkItemResponse.getFailure();
-                                System.out.println("Error" + failure.toString());
+                                System.out.println("Error " + failure.toString());
                             }
                         }
                     }
@@ -122,11 +121,9 @@ public class BulkProcessorUpload {
                 System.out.println("Some requests have not been processed");
             }
 
-            System.out.println("And finished");
-
             client.close();
             long tn=System.currentTimeMillis();
-            System.out.println(tn-t);
+            System.out.println("Took " + (tn - t) / 1000 + " seconds");
 
 
         } catch (IOException|InterruptedException e) {
