@@ -10,7 +10,7 @@
     </properties>
 
     <groupId>compose</groupId>
-    <artifactId>bulkloadenron</artifactId>
+    <artifactId>elasticsearchupload</artifactId>
     <version>1.0-SNAPSHOT</version>
     <dependencies><dependency>
         <groupId>org.elasticsearch.client</groupId>
