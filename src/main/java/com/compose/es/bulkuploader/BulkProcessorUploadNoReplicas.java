@@ -1,10 +1,13 @@
 package com.compose.es.bulkuploader;
 
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
+import org.apache.http.entity.ContentType;
 import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.nio.entity.NStringEntity;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
 import org.elasticsearch.action.admin.indices.create.CreateIndexResponse;
 import org.elasticsearch.action.bulk.BulkItemResponse;
@@ -15,6 +18,7 @@ import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentType;
 
 import java.io.BufferedReader;
@@ -22,12 +26,14 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-public class BulkProcessorUpload {
+public class BulkProcessorUploadNoReplicas {
 
     public static void main(String[] args) {
-        long t=System.currentTimeMillis();
+        long t = System.currentTimeMillis();
 
         URL url = null;
 
@@ -58,6 +64,7 @@ public class BulkProcessorUpload {
             int statusCode = response.getStatusLine().getStatusCode();
             if (statusCode == 404) {
                 CreateIndexRequest cireq = new CreateIndexRequest(indexName);
+                cireq.settings(Settings.builder().put("index.number_of_replicas", 0));
                 CreateIndexResponse ciresp = client.indices().create(cireq);
                 System.out.println("Created index");
             } else {
@@ -79,7 +86,6 @@ public class BulkProcessorUpload {
                     if (bulkResponse.hasFailures()) {
                         for (BulkItemResponse bulkItemResponse : bulkResponse) {
                             if (bulkItemResponse.isFailed()) {
-                                System.out.println(bulkItemResponse.getOpType());
                                 BulkItemResponse.Failure failure = bulkItemResponse.getFailure();
                                 System.out.println("Error " + failure.toString());
                             }
@@ -105,17 +111,22 @@ public class BulkProcessorUpload {
 
             System.out.println("Waiting to finish");
 
+            String jsonString = "{ \"index\": { \"number_of_replicas\": 1 } }";
+            Map<String, String> params = Collections.emptyMap();
+            HttpEntity entity = new NStringEntity(jsonString, ContentType.APPLICATION_JSON);
+            Response resetresponse = client.getLowLevelClient().performRequest("PUT", "/" + indexName + "/_settings", null, entity);
+
             boolean terminated = bulkProcessor.awaitClose(30L, TimeUnit.SECONDS);
-            if(!terminated) {
+            if (!terminated) {
                 System.out.println("Some requests have not been processed");
             }
 
             client.close();
-            long tn=System.currentTimeMillis();
+            long tn = System.currentTimeMillis();
             System.out.println("Took " + (tn - t) / 1000 + " seconds");
 
 
-        } catch (IOException|InterruptedException e) {
+        } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
     }
